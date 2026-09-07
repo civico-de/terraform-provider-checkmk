@@ -33,13 +33,16 @@ type HostResource struct {
 
 // HostResourceModel describes the resource data model.
 type HostResourceModel struct {
-	ID                    types.String `tfsdk:"id"`
-	HostName              types.String `tfsdk:"host_name"`
-	Folder                types.String `tfsdk:"folder"`
-	Attributes            types.Map    `tfsdk:"attributes"`
-	Activate              types.String `tfsdk:"activate"`
-	ForceForeignChanges   types.Bool   `tfsdk:"force_foreign_changes"`
-	StrictResourceLocking types.Bool   `tfsdk:"strict_resource_locking"`
+	ID                      types.String `tfsdk:"id"`
+	HostName                types.String `tfsdk:"host_name"`
+	Folder                  types.String `tfsdk:"folder"`
+	Attributes              types.Map    `tfsdk:"attributes"`
+	Parents                 types.List   `tfsdk:"parents"`
+	AdditionalIPv4Addresses types.List   `tfsdk:"additional_ipv4addresses"`
+	AdditionalIPv6Addresses types.List   `tfsdk:"additional_ipv6addresses"`
+	Activate                types.String `tfsdk:"activate"`
+	ForceForeignChanges     types.Bool   `tfsdk:"force_foreign_changes"`
+	StrictResourceLocking   types.Bool   `tfsdk:"strict_resource_locking"`
 }
 
 func (r *HostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -68,6 +71,24 @@ func (r *HostResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 					"  - `site`: CheckMK site ID\n" +
 					"  - `tag_agent`: Agent type (e.g., 'cmk-agent', 'snmp-v2')\n\n" +
 					"All attributes are replaced on update (full replacement strategy).",
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"parents": schema.ListAttribute{
+				MarkdownDescription: "A list of parents of this host. CheckMK types this attribute as a list, " +
+					"so it cannot be set through `attributes`, which is a map of strings.",
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"additional_ipv4addresses": schema.ListAttribute{
+				MarkdownDescription: "A list of additional IPv4 addresses of this host. CheckMK types this " +
+					"attribute as a list, so it cannot be set through `attributes`.",
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"additional_ipv6addresses": schema.ListAttribute{
+				MarkdownDescription: "A list of additional IPv6 addresses of this host. CheckMK types this " +
+					"attribute as a list, so it cannot be set through `attributes`.",
 				ElementType: types.StringType,
 				Optional:    true,
 			},
@@ -101,6 +122,10 @@ func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, r
 				attributes[promoter.APIKey(key)] = strValue.ValueString()
 			}
 		}
+	}
+	resp.Diagnostics.Append(addListAttributes(ctx, &data, attributes)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	// Set default folder if not specified
@@ -188,6 +213,8 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.Append(diags...)
 	}
 
+	resp.Diagnostics.Append(readListAttributes(ctx, &data, host.Extensions.Attributes)...)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -210,6 +237,10 @@ func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, r
 				attributes[promoter.APIKey(key)] = strValue.ValueString()
 			}
 		}
+	}
+	resp.Diagnostics.Append(addListAttributes(ctx, &data, attributes)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	etag, err := common.FetchETagIfStrict(ctx, cfg.StrictResourceLocking, func(ctx context.Context) (string, error) {
@@ -306,4 +337,19 @@ func (r *HostResource) ValidateConfig(ctx context.Context, req resource.Validate
 	// Validate host attributes using generated types
 	validator := common.NewAttributeValidator(r.providerData)
 	resp.Diagnostics.Append(validator.ValidateHostAttributes(ctx, data.Attributes, path.Root("attributes"))...)
+
+	// List-typed attributes have their own resource attribute; the API rejects
+	// them as strings, so point at the typed attribute instead of failing on apply.
+	if !data.Attributes.IsNull() && !data.Attributes.IsUnknown() {
+		for key := range data.Attributes.Elements() {
+			if _, isList := data.hostListAttributes()[key]; isList {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("attributes").AtMapKey(key),
+					"List Attribute In attributes Map",
+					fmt.Sprintf("CheckMK types %[1]q as a list of strings. Set the %[1]q resource "+
+						"attribute instead of putting it into the attributes map.", key),
+				)
+			}
+		}
+	}
 }

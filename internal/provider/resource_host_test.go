@@ -95,3 +95,49 @@ resource "checkmk_host" "unprefixed" {
 }
 `, hostName)
 }
+
+// TestAccHostResource_ListAttributes verifies that the host attributes CheckMK
+// types as lists round-trip: they are sent as JSON arrays, read back into state
+// and produce no diff on the next plan.
+func TestAccHostResource_ListAttributes(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccHostResourceConfigListAttributes(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("checkmk_host.child", "parents.#", "1"),
+					resource.TestCheckResourceAttr("checkmk_host.child", "parents.0", "test-terraform-parent"),
+					resource.TestCheckResourceAttr("checkmk_host.child", "additional_ipv4addresses.#", "1"),
+					resource.TestCheckResourceAttr("checkmk_host.child", "additional_ipv4addresses.0", "127.0.0.3"),
+				),
+			},
+		},
+	})
+}
+
+func testAccHostResourceConfigListAttributes() string {
+	return `
+resource "checkmk_host" "parent" {
+  host_name = "test-terraform-parent"
+  folder    = "/"
+
+  attributes = {
+    ipaddress = "127.0.0.1"
+  }
+}
+
+resource "checkmk_host" "child" {
+  host_name = "test-terraform-child"
+  folder    = "/"
+
+  parents                  = [checkmk_host.parent.host_name]
+  additional_ipv4addresses = ["127.0.0.3"]
+
+  attributes = {
+    ipaddress = "127.0.0.2"
+  }
+}
+`
+}
