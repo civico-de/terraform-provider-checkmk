@@ -2,7 +2,7 @@
 
 This is civico's fork of
 [withakedo/terraform-provider-checkmk](https://github.com/withakedo/terraform-provider-checkmk),
-kept as the `upstream` remote. It carries two patches, each proposed upstream:
+kept as the `upstream` remote. It carries three patches, each proposed upstream:
 
 - **Relative `Location` on a `302`.** CheckMK's wait-for-completion endpoints send a
   path-only `Location`, which the upstream poll loop used verbatim as the next request
@@ -12,8 +12,12 @@ kept as the `upstream` remote. It carries two patches, each proposed upstream:
   host attributes CheckMK declares as arrays were rejected with `"Not a valid list."` -
   a host could not name its `parents`. `parents`, `additional_ipv4addresses` and
   `additional_ipv6addresses` have their own typed `list(string)` resource attributes.
+- **Importing a `checkmk_rule`.** Import writes only `api_id`, so the following `Read`
+  found a null `properties` object and failed to decode it into a struct that cannot hold
+  null - every `import` block for the generic rule resource errored out. `Read` builds
+  `properties` from the API response instead.
 
-The fork exists only until both are merged upstream; once they are, use the public
+The fork exists only until all three are merged upstream; once they are, use the public
 provider.
 
 Releases go to the in-house Terralist registry, never to the public one, and are versioned

@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failed with `unsupported protocol scheme ""`. Any activation or service discovery that did
   not complete within the first request hit this. The `Location` is now resolved against the
   request URL, as HTTP requires for a relative reference.
+- **Importing a `checkmk_rule` failed with a value conversion error.** `ImportState` writes only
+  `api_id` and a placeholder `id`, so the subsequent `Read` saw a null `properties` object and tried
+  to decode it into the non-nullable `RulePropertiesModel`, aborting the import with "Received null
+  value, however the target type cannot handle null values ... Target Type:
+  rules.RulePropertiesModel". `Read` now builds `properties` from the API response instead of
+  updating the prior state's copy, so a freshly imported rule reads its description, comment,
+  disabled flag and conditions from the site. The typed rule wrappers were unaffected.
 
 ## [1.4.4] - 2026-08-25
 
