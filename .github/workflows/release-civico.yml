@@ -1,0 +1,112 @@
+name: release-civico
+
+# Builds, signs and publishes one provider version to the private Terralist
+# registry. Manual only: publishing executable code is a deliberate act.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to release, for example 0.1.0
+        required: true
+      tag:
+        description: Reviewed immutable tag to build from, for example v0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: providers.civico.de
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Refuse a tag that does not match the version
+        run: |
+          if [ "${{ inputs.tag }}" != "v${{ inputs.version }}" ]; then
+            echo "tag ${{ inputs.tag }} does not match version ${{ inputs.version }}" >&2
+            exit 1
+          fi
+
+      # A replace directive points at a working copy, so the built artefact is
+      # not determined by the tag alone. Publishing executable code under a
+      # version that cannot be rebuilt is worse than not publishing.
+      - name: Refuse to release from an unpinned dependency
+        run: |
+          if grep -qE '^replace ' go.mod; then
+            echo "go.mod still has a replace directive; pin the module first" >&2
+            exit 1
+          fi
+
+      # The token stages the archives as a release Terralist can ingest by URL.
+      - name: Mint a GitHub App token
+        id: apptoken
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.CIVICO_APP_ID }}
+          private-key: ${{ secrets.CIVICO_APP_KEY }}
+          owner: civico-de
+          permission-contents: write
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build the release archives
+        run: |
+          scripts/build-mirror.sh "${{ inputs.version }}" "$RUNNER_TEMP/release" \
+            darwin_arm64 linux_amd64 linux_arm64
+
+      # The release key signs the SHA256SUMS file. Its armored public half is
+      # registered once on the civico authority, so both CLIs can verify.
+      - name: Sign the checksums
+        env:
+          RELEASE_GPG_KEY: ${{ secrets.PROVIDER_RELEASE_GPG_KEY }}
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.PROVIDER_RELEASE_GPG_PASSPHRASE }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 0700 -p "$GNUPGHOME"
+          printf '%s' "$RELEASE_GPG_KEY" | gpg --batch --quiet --import
+          key_id="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5; exit}')"
+          sums="$RUNNER_TEMP/release/providers.civico.de/civico/checkmk/terraform-provider-checkmk_${{ inputs.version }}_SHA256SUMS"
+          printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --quiet --pinentry-mode loopback \
+            --passphrase-fd 0 --local-user "$key_id" \
+            --detach-sign --output "$sums.sig" "$sums"
+          gpg --verify "$sums.sig" "$sums"
+
+      - name: Stage the archives as a private release
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+        run: |
+          cd "$RUNNER_TEMP/release/providers.civico.de/civico/checkmk"
+          gh release create "${{ inputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "${{ inputs.version }}" \
+            --notes "Private provider release ${{ inputs.version }}." \
+            terraform-provider-checkmk_${{ inputs.version }}_*
+
+      # Release assets are addressed by id, not by file name, so the asset URLs
+      # are resolved once and handed to the publish script as a map.
+      - name: Resolve the asset URLs
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/${{ inputs.tag }}" \
+            --jq '[.assets[] | {key: .name, value: .url}] | from_entries' \
+            > "$RUNNER_TEMP/asset-urls.json"
+          test -s "$RUNNER_TEMP/asset-urls.json"
+
+      - name: Publish to the private registry
+        env:
+          TERRALIST_URL: https://providers.civico.de
+          TERRALIST_API_KEY: ${{ secrets.TERRALIST_PUBLISH_KEY }}
+          ASSET_URL_MAP: ${{ runner.temp }}/asset-urls.json
+          ASSET_HEADERS: |
+            Authorization: Bearer ${{ steps.apptoken.outputs.token }}
+            Accept: application/octet-stream
+        run: |
+          scripts/publish-release.sh "${{ inputs.version }}" "$RUNNER_TEMP/release" -

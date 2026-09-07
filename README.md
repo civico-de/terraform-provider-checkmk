@@ -1,3 +1,49 @@
+## civico fork
+
+This is civico's fork of
+[withakedo/terraform-provider-checkmk](https://github.com/withakedo/terraform-provider-checkmk),
+kept as the `upstream` remote. It carries exactly one patch: CheckMK's wait-for-completion
+endpoints send a path-only `Location` on their `302`, which the upstream poll loop used
+verbatim as the next request URL, so every activation or service discovery that did not
+finish within the first request failed the apply. The fork exists only until that fix is
+merged upstream; once it is, use the public provider.
+
+Releases go to the in-house Terralist registry, never to the public one, and are versioned
+after the upstream release they are based on:
+
+```hcl
+terraform {
+  required_providers {
+    checkmk = {
+      source  = "providers.civico.de/civico/checkmk"
+      version = "= 1.4.4-civico.1"
+    }
+  }
+}
+```
+
+```bash
+tofu login providers.civico.de
+tofu init
+```
+
+Cutting a release is manual. Tag the reviewed commit on the `civico` branch, then dispatch
+the `release-civico` workflow:
+
+```bash
+git tag v1.4.4-civico.1 && git push origin v1.4.4-civico.1
+gh workflow run release-civico.yml -f version=1.4.4-civico.1 -f tag=v1.4.4-civico.1
+```
+
+The workflow builds `darwin_arm64`, `linux_amd64` and `linux_arm64` with
+`scripts/build-mirror.sh`, signs the checksums with the release key from the
+`providers.civico.de` environment, stages the archives as a GitHub release and registers them
+with `scripts/publish-release.sh`. Upstream's `release` workflow is untouched and still
+targets the public registry; it ignores `-civico.*` tags. `scripts/build-mirror.sh VERSION DIR`
+on its own produces an offline filesystem mirror.
+
+---
+
 <a id="top"></a>
 <div align="center">
 
