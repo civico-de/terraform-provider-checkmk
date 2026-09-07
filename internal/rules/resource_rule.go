@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -47,6 +48,15 @@ type RulePropertiesModel struct {
 	Description types.String `tfsdk:"description"`
 	Comment     types.String `tfsdk:"comment"`
 	Disabled    types.Bool   `tfsdk:"disabled"`
+}
+
+// rulePropertiesAttrTypes returns the attribute types of the properties object.
+func rulePropertiesAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"description": types.StringType,
+		"comment":     types.StringType,
+		"disabled":    types.BoolType,
+	}
 }
 
 func (r *RuleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -254,13 +264,6 @@ func (r *RuleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	// Extract properties from state to get description for hash generation
-	var properties RulePropertiesModel
-	resp.Diagnostics.Append(data.Properties.As(ctx, &properties, basetypes.ObjectAsOptions{})...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Regenerate hash from API data
 	hash := client.GenerateRuleHash(
 		rule.Extensions.Ruleset,
@@ -275,12 +278,15 @@ func (r *RuleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	data.Folder = types.StringValue(rule.Extensions.Folder)
 	data.ValueRaw = types.StringValue(rule.Extensions.ValueRaw)
 
-	// Update properties
-	properties.Description = types.StringValue(rule.Extensions.Properties.Description)
-	properties.Comment = types.StringValue(rule.Extensions.Properties.Comment)
-	properties.Disabled = types.BoolValue(rule.Extensions.Properties.Disabled)
+	// Build properties entirely from the API response: after an import the prior
+	// state holds a null object, which cannot be decoded into RulePropertiesModel.
+	properties := RulePropertiesModel{
+		Description: types.StringValue(rule.Extensions.Properties.Description),
+		Comment:     types.StringValue(rule.Extensions.Properties.Comment),
+		Disabled:    types.BoolValue(rule.Extensions.Properties.Disabled),
+	}
 
-	propertiesObj, diags := types.ObjectValueFrom(ctx, data.Properties.AttributeTypes(ctx), properties)
+	propertiesObj, diags := types.ObjectValueFrom(ctx, rulePropertiesAttrTypes(), properties)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
