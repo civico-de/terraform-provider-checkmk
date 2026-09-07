@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `302` during activation or service discovery failed the apply.** CheckMK's
+  "wait for completion" endpoints redirect to themselves while the operation is still
+  running, and send a path-only `Location` header
+  (`/cmk/check_mk/api/1.0/objects/activation_run/<id>/actions/wait-for-completion/invoke`).
+  The poll loop used that value verbatim as the next request URL, so the following request
+  failed with `unsupported protocol scheme ""`. Any activation or service discovery that did
+  not complete within the first request hit this. The `Location` is now resolved against the
+  request URL, as HTTP requires for a relative reference.
+
 ## [1.4.4] - 2026-08-25
 
 ### Fixed
