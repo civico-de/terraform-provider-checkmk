@@ -105,8 +105,14 @@ func (c *Client) pollSelfRedirectingCompletion(ctx context.Context, startURL str
 			return nil
 		case http.StatusFound:
 			// Still running; CheckMK redirects to itself to avoid timeouts.
+			// CheckMK sends a path-only Location, which is not a usable
+			// request URL on its own, so resolve it against the request URL.
 			if location := resp.Header.Get("Location"); location != "" {
-				url = location
+				if resolved, err := resp.Request.URL.Parse(location); err == nil {
+					url = resolved.String()
+				} else {
+					url = location
+				}
 			}
 			resp.Body.Close()
 			continue
