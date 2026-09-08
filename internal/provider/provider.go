@@ -57,6 +57,7 @@ type checkmkProviderModel struct {
 	MaxRetries            types.Int64  `tfsdk:"max_retries"`
 	InsecureSkipVerify    types.Bool   `tfsdk:"insecure_skip_verify"`
 	TypeMode              types.String `tfsdk:"type_mode"`
+	ServerVersion         types.String `tfsdk:"server_version"`
 }
 
 // ProviderData is an alias to common.ProviderData for backwards compatibility
@@ -142,6 +143,12 @@ func (p *checkmkProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Description: "Skip TLS certificate verification (default: false). " +
 					"WARNING: Only use this for testing with self-signed certificates. " +
 					"This makes the connection insecure and should not be used in production.",
+				Optional: true,
+			},
+			"server_version": schema.StringAttribute{
+				Description: "CheckMK version of the site, for example '2.4.0p10'. When set, the provider " +
+					"assumes this version instead of asking the site's /version endpoint while configuring " +
+					"itself, so a plan can run before the site is reachable. Leave unset to detect it.",
 				Optional: true,
 			},
 			"type_mode": schema.StringAttribute{
@@ -235,6 +242,19 @@ func (p *checkmkProvider) Configure(ctx context.Context, req provider.ConfigureR
 	// Insecure skip verify (default: false)
 	if !config.InsecureSkipVerify.IsNull() {
 		opts.InsecureSkipVerify = config.InsecureSkipVerify.ValueBool()
+	}
+
+	// A pinned server version skips the /version request at configure time
+	if !config.ServerVersion.IsNull() && config.ServerVersion.ValueString() != "" {
+		v, err := client.ParseVersion(config.ServerVersion.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid CheckMK Server Version",
+				fmt.Sprintf("server_version must look like '2.4.0p10': %s", err.Error()),
+			)
+			return
+		}
+		opts.Version = v
 	}
 
 	// Create CheckMK API client with options

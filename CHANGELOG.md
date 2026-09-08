@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`server_version` provider attribute.** The provider asks the site for its version
+  while it configures itself, and Terraform configures a provider on every plan, whether
+  or not a resource references it - so a configuration that provisions the CheckMK server
+  itself could never plan before the site existed. With `server_version` set, that request
+  is skipped and the given version is assumed; unset, the version is detected as before.
+
 ## [1.4.4] - 2026-08-25
 
 ### Fixed

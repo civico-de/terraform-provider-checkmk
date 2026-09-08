@@ -137,6 +137,10 @@ type ClientOptions struct {
 	// (activation, service discovery) independently of RequestTimeout.
 	// Defaults to 30 minutes if unset.
 	LongOperationTimeout time.Duration
+
+	// Version, when set, is taken as the site's version and the /version
+	// request on client creation is skipped.
+	Version *Version
 }
 
 // NewClient creates a new CheckMK API client
@@ -200,12 +204,16 @@ func NewClientWithOptions(baseURL, username, password string, opts *ClientOption
 		LongOperationTimeout: longOperationTimeout,
 	}
 
-	// Detect version on initialization
-	version, err := client.GetVersion(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect CheckMK version: %w", err)
+	// Detect version on initialization unless the caller pinned one
+	if opts != nil && opts.Version != nil {
+		client.Version = opts.Version
+	} else {
+		version, err := client.GetVersion(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect CheckMK version: %w", err)
+		}
+		client.Version = version
 	}
-	client.Version = version
 
 	return client, nil
 }

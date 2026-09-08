@@ -177,6 +177,7 @@ provider "checkmk" {
 - `max_retries` (Number) Maximum number of retries for failed API requests (default: 3). Retries occur on transient errors (429, 500, 502, 503, 504) with exponential backoff.
 - `password` (String, Sensitive) CheckMK automation user password. May also be provided via CHECKMK_PASSWORD environment variable.
 - `request_timeout` (Number) HTTP request timeout in seconds (default: 60). Increase this value for slow networks or large API responses.
+- `server_version` (String) CheckMK version of the site, for example '2.4.0p10'. When set, the provider assumes this version instead of asking the site's /version endpoint while configuring itself, so a plan can run before the site is reachable. Leave unset to detect it.
 - `strict_resource_locking` (Boolean) Enable strict ETag-based locking (default: false). When false, uses If-Match: * to bypass ETag validation for both activation and resource operations (Python approach). When true, fetches and validates ETags for activation endpoint and resource operations (enforces concurrency control).
 - `type_mode` (String) Type validation mode (default: 'auto'). 'auto': Use static types for known versions (2.2, 2.3, 2.4, 2.5), fall back to hollow with warning for unknown. 'static': Use static types for known versions, fail with error for unknown versions. 'hollow': Accept any attributes and rely on the API for validation.
 - `url` (String) CheckMK server URL (e.g., http://localhost:5000/test). May also be provided via CHECKMK_URL environment variable.
