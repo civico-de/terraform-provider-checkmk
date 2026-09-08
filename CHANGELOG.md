@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`server_version` provider attribute.** The provider asks the site for its version
+  while it configures itself, and Terraform configures a provider on every plan, whether
+  or not a resource references it - so a configuration that provisions the CheckMK server
+  itself could never plan before the site existed. With `server_version` set, that request
+  is skipped and the given version is assumed; unset, the version is detected as before.
 - **`checkmk_host` can set the host attributes CheckMK types as lists.** `attributes`
   is a `map(string)`, so a list-typed attribute sent through it made the API answer
   `{"attributes": {"parents": ["Not a valid list."]}}`. The three attributes the API

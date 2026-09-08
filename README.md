@@ -2,7 +2,7 @@
 
 This is civico's fork of
 [withakedo/terraform-provider-checkmk](https://github.com/withakedo/terraform-provider-checkmk),
-kept as the `upstream` remote. It carries three patches, each proposed upstream:
+kept as the `upstream` remote. It carries four patches, each proposed upstream:
 
 - **Relative `Location` on a `302`.** CheckMK's wait-for-completion endpoints send a
   path-only `Location`, which the upstream poll loop used verbatim as the next request
@@ -16,8 +16,11 @@ kept as the `upstream` remote. It carries three patches, each proposed upstream:
   found a null `properties` object and failed to decode it into a struct that cannot hold
   null - every `import` block for the generic rule resource errored out. `Read` builds
   `properties` from the API response instead.
+- **`server_version`.** The provider asks the site for its version while configuring
+  itself, on every plan, so a root that provisions the monitor server could never plan
+  before the site existed. A pinned `server_version` skips that request.
 
-The fork exists only until all three are merged upstream; once they are, use the public
+The fork exists only until all four are merged upstream; once they are, use the public
 provider.
 
 Releases go to the in-house Terralist registry, never to the public one, and are versioned
