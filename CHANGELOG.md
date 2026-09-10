@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or not a resource references it - so a configuration that provisions the CheckMK server
   itself could never plan before the site existed. With `server_version` set, that request
   is skipped and the given version is assumed; unset, the version is detected as before.
+- **`checkmk_host` can set the host attributes CheckMK types as lists.** `attributes`
+  is a `map(string)`, so a list-typed attribute sent through it made the API answer
+  `{"attributes": {"parents": ["Not a valid list."]}}`. The three attributes the API
+  declares as arrays of strings - `parents`, `additional_ipv4addresses` and
+  `additional_ipv6addresses` - now have their own typed resource attributes, are sent
+  as JSON arrays and are read back into state. Putting one of them into the
+  `attributes` map is now a config error naming the typed attribute, instead of a
+  failure at apply time.
 
 ## [1.4.4] - 2026-08-25
 
