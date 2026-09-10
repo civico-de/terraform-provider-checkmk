@@ -47,6 +47,8 @@ resource "checkmk_host" "example" {
 ### Optional
 
 - `activate` (String) Override provider-level activation mode for this resource. Options: 'auto', 'manual'. If not set, uses provider configuration.
+- `additional_ipv4addresses` (List of String) A list of additional IPv4 addresses of this host. CheckMK types this attribute as a list, so it cannot be set through `attributes`.
+- `additional_ipv6addresses` (List of String) A list of additional IPv6 addresses of this host. CheckMK types this attribute as a list, so it cannot be set through `attributes`.
 - `attributes` (Map of String) Host attributes as key-value pairs. Common attributes include:
   - `alias`: Human-readable host alias
   - `ipaddress`: IP address of the host
@@ -56,6 +58,7 @@ resource "checkmk_host" "example" {
 All attributes are replaced on update (full replacement strategy).
 - `folder` (String) The folder path where the host will be created. Default is '/' (root folder). Path delimiters can be `~`, `/`, or `\`.
 - `force_foreign_changes` (Boolean) Override provider-level force_foreign_changes for this resource. If not set, uses provider configuration.
+- `parents` (List of String) A list of parents of this host. CheckMK types this attribute as a list, so it cannot be set through `attributes`, which is a map of strings.
 - `strict_resource_locking` (Boolean) Override provider-level strict_resource_locking for this resource. Controls ETag validation for resource operations. If not set, uses provider configuration.
 
 ### Read-Only
