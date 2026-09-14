@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: providers.civico.de
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
           persist-credentials: false
@@ -48,7 +48,7 @@ jobs:
         id: apptoken
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.CIVICO_APP_ID }}
+          client-id: ${{ vars.CIVICO_APP_CLIENT_ID }}
           private-key: ${{ secrets.CIVICO_APP_KEY }}
           owner: civico-de
           permission-contents: write
